@@ -24,8 +24,9 @@ type Unique interface {
 }
 
 //InitSession creates a new Session Store.
-func InitSession(secret, storeN string) {
+func InitSession(secret, storeN, domain string) {
 	store = sessions.NewCookieStore([]byte(secret))
+	store.Options.Domain = domain
 	storeName = storeN
 }
 
