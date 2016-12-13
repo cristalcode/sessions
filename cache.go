@@ -34,7 +34,7 @@ func setCacheSession(s *Session) errors.Message {
 	if err != nil {
 		return errors.NewMessage(http.StatusInternalServerError, err)
 	}
-	err = cache.Set(&memcache.Item{Key: s.Token, Value: buff.Bytes()})
+	err = cache.Set(&memcache.Item{Key: s.token, Value: buff.Bytes()})
 	if err != nil {
 		return errors.NewMessage(http.StatusInternalServerError, err)
 	}
@@ -42,7 +42,7 @@ func setCacheSession(s *Session) errors.Message {
 }
 
 func getCacheSession(s *Session) errors.Message {
-	item, err := cache.Get(s.Token)
+	item, err := cache.Get(s.token)
 	if err != nil {
 		if err == memcache.ErrCacheMiss {
 			return errors.NewMessage(http.StatusUnauthorized, ex.New("no session"))
@@ -59,7 +59,7 @@ func getCacheSession(s *Session) errors.Message {
 }
 
 func deleteCacheSession(s *Session) errors.Message {
-	err := cache.Delete(s.Token)
+	err := cache.Delete(s.token)
 	if err != nil {
 		return errors.NewMessage(http.StatusInternalServerError, err)
 	}
