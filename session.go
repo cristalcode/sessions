@@ -15,7 +15,7 @@ var storeName string
 //Session saves an user Session in memcached.
 type Session struct {
 	Value Unique
-	Token string `json:"-"`
+	token string
 }
 
 //Unique is needs GetID function and is used as Value in Session struct.
@@ -31,10 +31,10 @@ func InitSession(secret, storeN, domain string) {
 }
 
 //NewSession returns a new Session
-func NewSession(u Unique, token string) Session {
+func NewSession(u Unique) Session {
 	return Session{
 		Value: u,
-		Token: token,
+		token: generateToken(),
 	}
 }
 
@@ -44,7 +44,7 @@ func (s *Session) Save(c *gin.Context) errors.Message {
 	if err != nil {
 		return errors.NewMessage(http.StatusInternalServerError, err)
 	}
-	session.Values["token"] = s.Token
+	session.Values["token"] = s.token
 	ex := setCacheSession(s)
 	if ex != errors.NoError {
 		return ex
@@ -76,7 +76,7 @@ func (s *Session) Get(c *gin.Context) errors.Message {
 		return errors.NewMessage(http.StatusInternalServerError, err)
 	}
 	var ok bool
-	s.Token, ok = session.Values["token"].(string)
+	s.token, ok = session.Values["token"].(string)
 	if !ok {
 		return errors.NewMessage(http.StatusUnauthorized, ex.New("no Session"))
 	}
