@@ -39,12 +39,12 @@ func NewSession(u Unique) Session {
 }
 
 //Save set values of session.
-func (s *Session) Save(c *gin.Context) errors.Message {
+func (s *Session) Save(c *gin.Context, key string) errors.Message {
 	session, err := store.Get(c.Request, storeName)
 	if err != nil {
 		return errors.NewMessage(http.StatusInternalServerError, err)
 	}
-	session.Values["token"] = s.token
+	session.Values[key] = s.token
 	ex := setCacheSession(s)
 	if ex != errors.NoError {
 		return ex
@@ -61,8 +61,8 @@ func (s *Session) update() errors.Message {
 }
 
 //GetID returns value ID.
-func (s *Session) GetID(c *gin.Context) (ID string, ex errors.Message) {
-	ex = s.Get(c)
+func (s *Session) GetID(c *gin.Context, key string) (ID string, ex errors.Message) {
+	ex = s.Get(c, key)
 	if ex == errors.NoError {
 		ID = s.Value.GetID()
 	}
@@ -70,13 +70,13 @@ func (s *Session) GetID(c *gin.Context) (ID string, ex errors.Message) {
 }
 
 //Get returns information of session.
-func (s *Session) Get(c *gin.Context) errors.Message {
+func (s *Session) Get(c *gin.Context, key string) errors.Message {
 	session, err := store.Get(c.Request, storeName)
 	if err != nil {
 		return errors.NewMessage(http.StatusInternalServerError, err)
 	}
 	var ok bool
-	s.token, ok = session.Values["token"].(string)
+	s.token, ok = session.Values[key].(string)
 	if !ok {
 		return errors.NewMessage(http.StatusUnauthorized, ex.New("no Session"))
 	}
@@ -92,12 +92,12 @@ func (s *Session) Get(c *gin.Context) errors.Message {
 }
 
 //Delete removes session.
-func (s *Session) Delete(c *gin.Context) errors.Message {
+func (s *Session) Delete(c *gin.Context, key string) errors.Message {
 	session, err := store.Get(c.Request, storeName)
 	if err != nil {
 		return errors.NewMessage(http.StatusInternalServerError, err)
 	}
-	delete(session.Values, "token")
+	delete(session.Values, key)
 	err = session.Save(c.Request, c.Writer)
 	if err != nil {
 		return errors.NewMessage(http.StatusInternalServerError, err)
