@@ -3,12 +3,9 @@ package sessions
 import (
 	"bytes"
 	"encoding/gob"
-	ex "errors"
-	"net/http"
 	"time"
 
 	"github.com/bradfitz/gomemcache/memcache"
-	"gitlab.com/sociallabs/quickrest/errors"
 )
 
 var (
@@ -20,48 +17,36 @@ func InitCache(cacheHost string, uniques ...Unique) {
 	cache = memcache.New(cacheHost)
 	cache.Timeout = 5 * time.Second
 	if cache == nil {
-		panic("Nil Memcached client in host: " + cacheHost)
+		panic("memcached is not running on: " + cacheHost)
 	}
 	for _, u := range uniques {
 		gob.Register(u)
 	}
 }
 
-func setCacheSession(s *Session) errors.Message {
+func setCacheSession(s *Session) error {
 	buff := new(bytes.Buffer)
 	enc := gob.NewEncoder(buff)
 	err := enc.Encode(s)
 	if err != nil {
-		return errors.NewMessage(http.StatusInternalServerError, err)
+		return err
 	}
-	err = cache.Set(&memcache.Item{Key: s.token, Value: buff.Bytes()})
-	if err != nil {
-		return errors.NewMessage(http.StatusInternalServerError, err)
-	}
-	return errors.NoError
+	return cache.Set(&memcache.Item{Key: s.token, Value: buff.Bytes()})
 }
 
-func getCacheSession(s *Session) errors.Message {
+func getCacheSession(s *Session) error {
 	item, err := cache.Get(s.token)
 	if err != nil {
 		if err == memcache.ErrCacheMiss {
-			return errors.NewMessage(http.StatusUnauthorized, ex.New("no session"))
+			return ErrNoSession
 		}
-		return errors.NewMessage(http.StatusInternalServerError, err)
+		return err
 	}
 	buff := bytes.NewBuffer(item.Value)
 	dec := gob.NewDecoder(buff)
-	err = dec.Decode(s)
-	if err != nil {
-		return errors.NewMessage(http.StatusInternalServerError, err)
-	}
-	return errors.NoError
+	return dec.Decode(s)
 }
 
-func deleteCacheSession(s *Session) errors.Message {
-	err := cache.Delete(s.token)
-	if err != nil {
-		return errors.NewMessage(http.StatusInternalServerError, err)
-	}
-	return errors.NoError
+func deleteCacheSession(s *Session) error {
+	return cache.Delete(s.token)
 }

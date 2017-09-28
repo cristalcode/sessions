@@ -1,12 +1,9 @@
 package sessions
 
 import (
-	ex "errors"
 	"net/http"
 
-	"github.com/gin-gonic/gin"
 	"github.com/gorilla/sessions"
-	"gitlab.com/sociallabs/quickrest/errors"
 )
 
 var store *sessions.CookieStore
@@ -39,68 +36,56 @@ func NewSession(u Unique) Session {
 }
 
 //Save set values of session.
-func (s *Session) Save(c *gin.Context, key string) errors.Message {
-	session, err := store.Get(c.Request, storeName)
+func (s *Session) Save(r *http.Request, w http.ResponseWriter, key string) error {
+	session, err := store.Get(r, storeName)
 	if err != nil {
-		return errors.NewMessage(http.StatusInternalServerError, err)
+		return err
 	}
 	session.Values[key] = s.token
-	ex := setCacheSession(s)
-	if ex != errors.NoError {
-		return ex
-	}
-	err = session.Save(c.Request, c.Writer)
+	err = setCacheSession(s)
 	if err != nil {
-		return errors.NewMessage(http.StatusInternalServerError, err)
+		return err
 	}
-	return errors.NoError
+	return session.Save(r, w)
 }
 
-func (s *Session) update() errors.Message {
+func (s *Session) update() error {
 	return setCacheSession(s)
 }
 
 //GetID returns value ID.
-func (s *Session) GetID(c *gin.Context, key string) (ID string, ex errors.Message) {
-	ex = s.Get(c, key)
-	if ex == errors.NoError {
+func (s *Session) GetID(r *http.Request, w http.ResponseWriter, key string) (ID string, err error) {
+	err = s.Get(r, w, key)
+	if err == nil {
 		ID = s.Value.GetID()
 	}
 	return
 }
 
 //Get returns information of session.
-func (s *Session) Get(c *gin.Context, key string) errors.Message {
-	session, err := store.Get(c.Request, storeName)
+func (s *Session) Get(r *http.Request, w http.ResponseWriter, key string) error {
+	session, err := store.Get(r, storeName)
 	if err != nil {
-		return errors.NewMessage(http.StatusInternalServerError, err)
+		return err
 	}
 	var ok bool
 	s.token, ok = session.Values[key].(string)
 	if !ok {
-		return errors.NewMessage(http.StatusUnauthorized, ex.New("no Session"))
+		return ErrNoSession
 	}
-	ex := getCacheSession(s)
-	if ex != errors.NoError {
-		return ex
-	}
-	err = session.Save(c.Request, c.Writer)
-	if err != nil {
-		return errors.NewMessage(http.StatusInternalServerError, err)
-	}
-	return errors.NoError
+	return getCacheSession(s)
 }
 
 //Delete removes session.
-func (s *Session) Delete(c *gin.Context, key string) errors.Message {
-	session, err := store.Get(c.Request, storeName)
+func (s *Session) Delete(r *http.Request, w http.ResponseWriter, key string) error {
+	session, err := store.Get(r, storeName)
 	if err != nil {
-		return errors.NewMessage(http.StatusInternalServerError, err)
+		return err
 	}
 	delete(session.Values, key)
-	err = session.Save(c.Request, c.Writer)
+	err = session.Save(r, w)
 	if err != nil {
-		return errors.NewMessage(http.StatusInternalServerError, err)
+		return err
 	}
 	return deleteCacheSession(s)
 }
