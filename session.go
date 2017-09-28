@@ -13,31 +13,34 @@ var storeName string
 type Session struct {
 	Value Unique
 	token string
+	req   *http.Request
+	rw    http.ResponseWriter
 }
 
-//Unique is needs GetID function and is used as Value in Session struct.
+//Unique needs GetID function and is used as Value in Session struct.
 type Unique interface {
 	GetID() string
 }
 
-//InitSession creates a new Session Store.
+//InitSession creates a new gorilla CookieStore.
 func InitSession(secret, storeN, domain string) {
 	store = sessions.NewCookieStore([]byte(secret))
 	store.Options.Domain = domain
 	storeName = storeN
 }
 
-//NewSession returns a new Session
-func NewSession(u Unique) Session {
-	return Session{
-		Value: u,
-		token: generateToken(),
+//NewSession returns a new Session using request and response for futher functions.
+func NewSession(r *http.Request, w http.ResponseWriter) *Session {
+	return &Session{
+		req: r,
+		rw:  w,
 	}
 }
 
-//Save set values of session.
-func (s *Session) Save(r *http.Request, w http.ResponseWriter, key string) error {
-	session, err := store.Get(r, storeName)
+//Save stores token into CookieStore and memcached.
+func (s *Session) Save(u Unique, key string) error {
+	s.token = newToken()
+	session, err := store.Get(s.req, storeName)
 	if err != nil {
 		return err
 	}
@@ -46,25 +49,28 @@ func (s *Session) Save(r *http.Request, w http.ResponseWriter, key string) error
 	if err != nil {
 		return err
 	}
-	return session.Save(r, w)
+	s.Value = u
+	return session.Save(s.req, s.rw)
 }
 
-func (s *Session) update() error {
+//Update saves new session value into memcached storage.
+func (s *Session) Update(u Unique, key string) error {
+	session, err := store.Get(s.req, storeName)
+	if err != nil {
+		return err
+	}
+	var ok bool
+	s.token, ok = session.Values[key].(string)
+	if !ok {
+		return ErrNoSession
+	}
+	s.Value = u
 	return setCacheSession(s)
 }
 
-//GetID returns value ID.
-func (s *Session) GetID(r *http.Request, w http.ResponseWriter, key string) (ID string, err error) {
-	err = s.Get(r, w, key)
-	if err == nil {
-		ID = s.Value.GetID()
-	}
-	return
-}
-
-//Get returns information of session.
-func (s *Session) Get(r *http.Request, w http.ResponseWriter, key string) error {
-	session, err := store.Get(r, storeName)
+//Get uses CookieStore to get saved token and gets session value from memcached storage.
+func (s *Session) Get(key string) error {
+	session, err := store.Get(s.req, storeName)
 	if err != nil {
 		return err
 	}
@@ -76,14 +82,23 @@ func (s *Session) Get(r *http.Request, w http.ResponseWriter, key string) error 
 	return getCacheSession(s)
 }
 
-//Delete removes session.
-func (s *Session) Delete(r *http.Request, w http.ResponseWriter, key string) error {
-	session, err := store.Get(r, storeName)
+//GetID returns value ID.
+func (s *Session) GetID(key string) (id string, err error) {
+	err = s.Get(key)
+	if err != nil {
+		id = s.Value.GetID()
+	}
+	return
+}
+
+//Delete removes token of CookieStore and memcached value.
+func (s *Session) Delete(key string) error {
+	session, err := store.Get(s.req, storeName)
 	if err != nil {
 		return err
 	}
 	delete(session.Values, key)
-	err = session.Save(r, w)
+	err = session.Save(s.req, s.rw)
 	if err != nil {
 		return err
 	}

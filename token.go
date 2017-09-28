@@ -51,8 +51,8 @@ func (u *uuid) SetVariant() {
 	u[8] = (u[8] & 0xbf) | 0x80
 }
 
-// generateToken returns random generated UUID.
-func generateToken() string {
+// newToken returns random generated UUID.
+func newToken() string {
 	u := uuid{}
 	safeRandom(u[:])
 	u.SetVersion(4)
