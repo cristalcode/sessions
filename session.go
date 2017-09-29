@@ -45,11 +45,11 @@ func (s *Session) Save(u Unique, key string) error {
 		return err
 	}
 	session.Values[key] = s.token
+	s.Value = u
 	err = setCacheSession(s)
 	if err != nil {
 		return err
 	}
-	s.Value = u
 	return session.Save(s.req, s.rw)
 }
 
